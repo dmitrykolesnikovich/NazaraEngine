@@ -384,6 +384,8 @@ namespace Nz
 		Unused = -1,
 
 		Color,
+		JointIndices,
+		JointWeights,
 		Normal,
 		Position,
 		Tangent,

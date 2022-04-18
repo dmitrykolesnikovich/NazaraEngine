@@ -13,8 +13,6 @@ namespace Nz
 {
 	GraphicalMesh::GraphicalMesh(const Mesh& mesh)
 	{
-		assert(mesh.GetAnimationType() == AnimationType::Static);
-
 		const std::shared_ptr<RenderDevice>& renderDevice = Graphics::Instance()->GetRenderDevice();
 
 		m_subMeshes.reserve(mesh.GetSubMeshCount());
