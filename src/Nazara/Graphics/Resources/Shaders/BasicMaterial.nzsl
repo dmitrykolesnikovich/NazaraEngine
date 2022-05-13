@@ -4,6 +4,9 @@ module BasicMaterial;
 import InstanceData from Engine.InstanceData;
 import ViewerData from Engine.ViewerData;
 
+option ForwardPass: bool = true;
+
+// Basic material options
 option HasDiffuseTexture: bool = false;
 option HasAlphaTexture: bool = false;
 option AlphaTest: bool = false;
@@ -47,9 +50,18 @@ struct FragIn
 	[location(1), cond(HasColor)] color: vec4[f32]
 }
 
+// Fragment stage
+[cond(ForwardPass)]
 struct FragOut
 {
 	[location(0)] RenderTarget0: vec4[f32]
+}
+
+[cond(!ForwardPass)]
+struct FragOut
+{
+	[location(0)] DiffuseMap: vec4[f32],
+	[location(1)] NormalMap: vec4[f32]
 }
 
 [entry(frag)]
@@ -75,9 +87,21 @@ fn main(input: FragIn) -> FragOut
 			discard;
 	}
 
-	let output: FragOut;
-	output.RenderTarget0 = diffuseColor;
-	return output;
+	const if (ForwardPass)
+	{
+		let output: FragOut;
+		output.RenderTarget0 = diffuseColor;
+		return output;
+	}
+	else
+	{
+		// Deferred shading
+		let output: FragOut;
+		output.DiffuseMap = diffuseColor;
+		output.NormalMap = vec4[f32](0.0, 0.0, 0.0, 1.0);
+
+		return output;
+	}
 }
 
 // Vertex stage

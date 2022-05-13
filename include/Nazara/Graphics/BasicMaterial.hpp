@@ -69,6 +69,7 @@ namespace Nz
 			struct BasicOptionIndexes
 			{
 				std::size_t alphaTest;
+				std::size_t forwardPass;
 				std::size_t hasAlphaMap;
 				std::size_t hasDiffuseMap;
 			};

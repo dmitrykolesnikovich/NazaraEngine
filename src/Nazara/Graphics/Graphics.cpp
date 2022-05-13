@@ -37,6 +37,10 @@ namespace Nz
 			#include <Nazara/Graphics/Resources/Shaders/PhongMaterial.nzslb.h>
 		};
 
+		const UInt8 r_fullscreenVertexShader[] = {
+			#include <Nazara/Graphics/Resources/Shaders/Fullscreen.vert.nzslb.h>
+		};
+
 		const UInt8 r_instanceDataModule[] = {
 			#include <Nazara/Graphics/Resources/Shaders/Modules/Engine/InstanceData.nzslb.h>
 		};
@@ -48,6 +52,10 @@ namespace Nz
 		const UInt8 r_viewerDataModule[] = {
 			#include <Nazara/Graphics/Resources/Shaders/Modules/Engine/ViewerData.nzslb.h>
 		};
+
+		const UInt8 r_phongLightingShaderSource[] = {
+			#include <Nazara/Graphics/Resources/Shaders/PhongLightingPass.nzslb.h>
+		};
 	}
 
 	/*!
@@ -57,6 +65,7 @@ namespace Nz
 	*/
 	Graphics::Graphics(Config config) :
 	ModuleBase("Graphics", this),
+	m_preferredDepthFormat(PixelFormat::Undefined),
 	m_preferredDepthStencilFormat(PixelFormat::Undefined)
 	{
 		Renderer* renderer = Renderer::Instance();
@@ -95,6 +104,7 @@ namespace Nz
 
 		BuildDefaultTextures();
 		RegisterShaderModules();
+		BuildFullscreenVertexBuffer();
 		BuildBlitPipeline();
 		RegisterMaterialPasses();
 		SelectDepthStencilFormats();
@@ -204,6 +214,7 @@ namespace Nz
 
 	void Graphics::RegisterMaterialPasses()
 	{
+		m_materialPassRegistry.RegisterPass("GBufferPass");
 		m_materialPassRegistry.RegisterPass("ForwardPass");
 		m_materialPassRegistry.RegisterPass("DepthPass");
 	}
@@ -219,6 +230,8 @@ namespace Nz
 		RegisterEmbedShaderModule(r_instanceDataModule);
 		RegisterEmbedShaderModule(r_lightDataModule);
 		RegisterEmbedShaderModule(r_viewerDataModule);
+		RegisterEmbedShaderModule(r_fullscreenVertexShader);
+		RegisterEmbedShaderModule(r_phongLightingShaderSource);
 
 #ifdef NAZARA_DEBUG
 		// Override embed files with dev files in debug
@@ -240,6 +253,15 @@ namespace Nz
 
 	void Graphics::SelectDepthStencilFormats()
 	{
+		for (PixelFormat depthCandidate : { PixelFormat::Depth32F, PixelFormat::Depth24, PixelFormat::Depth16 })
+		{
+			if (m_renderDevice->IsTextureFormatSupported(depthCandidate, TextureUsage::DepthStencilAttachment))
+			{
+				m_preferredDepthFormat = depthCandidate;
+				break;
+			}
+		}
+
 		for (PixelFormat depthStencilCandidate : { PixelFormat::Depth24Stencil8, PixelFormat::Depth32FStencil8, PixelFormat::Depth16Stencil8 })
 		{
 			if (m_renderDevice->IsTextureFormatSupported(depthStencilCandidate, TextureUsage::DepthStencilAttachment))
@@ -248,6 +270,9 @@ namespace Nz
 				break;
 			}
 		}
+
+		if (m_preferredDepthFormat == PixelFormat::Undefined)
+			throw std::runtime_error("no supported depth format found");
 
 		if (m_preferredDepthStencilFormat == PixelFormat::Undefined)
 			throw std::runtime_error("no supported depth-stencil format found");

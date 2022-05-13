@@ -32,6 +32,7 @@ namespace Nz
 		else
 		{
 			m_basicOptionIndexes.alphaTest = materialSettings->GetOptionIndex("AlphaTest");
+			m_basicOptionIndexes.forwardPass = materialSettings->GetOptionIndex("ForwardPass");
 			m_basicOptionIndexes.hasAlphaMap = materialSettings->GetOptionIndex("HasAlphaMap");
 			m_basicOptionIndexes.hasDiffuseMap = materialSettings->GetOptionIndex("HasDiffuseMap");
 
@@ -205,6 +206,12 @@ namespace Nz
 		}
 
 		// Options
+
+		// ForwardPass
+		if (options.basicOptionIndexes)
+			options.basicOptionIndexes->forwardPass = settings.options.size();
+
+		MaterialSettings::BuildOption(settings.options, "ForwardPass", "ForwardPass");
 
 		// HasDiffuseMap
 		if (options.basicOptionIndexes)

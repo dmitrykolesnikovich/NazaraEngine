@@ -1,0 +1,313 @@
+[nzsl_version("1.0")]
+module PhongLightingPass;
+
+import DeferredShading.NormalEncoding;
+import Engine.LightData; //< TODO: Import only Light
+import Engine.ViewerData;
+
+option LightType: i32;
+
+[layout(std140)]
+struct MaterialSettings
+{
+	// BasicSettings
+	AlphaThreshold: f32,
+	DiffuseColor: vec4[f32],
+
+	// PhongSettings
+	AmbientColor: vec3[f32],
+	SpecularColor: vec3[f32],
+	Shininess: f32,
+}
+
+[layout(std140)]
+struct InstanceData
+{
+	worldMatrix: mat4[f32],
+	invWorldMatrix: mat4[f32]
+}
+
+// TODO: Add enums
+const DirectionalLight = 0;
+const PointLight = 1;
+const SpotLight = 2;
+
+[layout(std140)]
+struct LightMeshData
+{
+	worldMatrix: mat4[f32]
+}
+
+[set(0)]
+external
+{
+	[binding(0)] viewerData: uniform[ViewerData],
+	[binding(1)] albedoMap: sampler2D[f32],
+	[binding(2)] normalMap: sampler2D[f32],
+	[binding(3)] depthMap: sampler2D[f32]
+}
+
+[set(1), cond(LightType == DirectionalLight)]
+external
+{
+	[binding(0)] lightData: uniform[Light]
+}
+
+[set(1), cond(LightType != DirectionalLight)]
+external
+{
+	[binding(0)] lightData: uniform[Light],
+	[binding(1)] meshData: uniform[LightMeshData]
+}
+
+struct FragIn
+{
+	[builtin(fragcoord)] fragcoord: vec4[f32]
+}
+
+struct FragOut
+{
+	[location(0)] color: vec4[f32]
+}
+
+[entry(frag)]
+fn main(input: FragIn) -> FragOut
+{
+	let texCoords = input.fragcoord.xy * viewerData.invRenderTargetSize;
+
+	let albedo = albedoMap.Sample(texCoords);
+	let normal = DecodeNormal(normalMap.Sample(texCoords).rgb);
+	let depth = depthMap.Sample(texCoords).r;
+
+	let viewspace = vec4[f32](texCoords * 2.0 - vec2[f32](1.0, 1.0), depth, 1.0);
+	let worldPos = viewerData.invViewProjMatrix * viewspace;
+	let worldPos = worldPos.xyz / worldPos.w;
+
+	let lightAmbient  = vec3[f32](0.0, 0.0, 0.0);
+	let lightDiffuse  = vec3[f32](0.0, 0.0, 0.0);
+	let lightSpecular = vec3[f32](0.0, 0.0, 0.0);
+
+	let eyeVec = normalize(viewerData.eyePosition - worldPos);
+
+	let lightAmbientFactor = lightData.factor.x;
+	let lightDiffuseFactor = lightData.factor.y;
+
+	const if (LightType == DirectionalLight)
+	{
+		let lightDir = lightData.parameter1.xyz;
+
+		lightAmbient += lightData.color.rgb * lightAmbientFactor /* settings.AmbientColor */;
+
+		let lambert = max(dot(normal, -lightDir), 0.0);
+
+		lightDiffuse += lambert * lightData.color.rgb * lightDiffuseFactor;
+
+		let reflection = reflect(lightDir, normal);
+		let specFactor = max(dot(reflection, eyeVec), 0.0);
+		specFactor = pow(specFactor, 2.0 /* Shininess */);
+
+		lightSpecular += specFactor * lightData.color.rgb;
+	}
+	else if (LightType == PointLight || LightType == SpotLight)
+	{
+		let lightPos = lightData.parameter1.xyz;
+		let lightInvRadius = lightData.parameter1.w;
+
+		let lightToPos = worldPos - lightPos;
+		let dist = length(lightToPos);
+		let lightToPosNorm = lightToPos / max(dist, 0.0001);
+
+		let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
+
+		const if (LightType == SpotLight)
+		{
+			let lightDir = lightData.parameter2.xyz;
+			let lightInnerAngle = lightData.parameter3.x;
+			let lightOuterAngle = lightData.parameter3.y;
+
+			let curAngle = dot(lightDir, lightToPosNorm);
+			let innerMinusOuterAngle = lightInnerAngle - lightOuterAngle;
+
+			attenuationFactor *= max((curAngle - lightOuterAngle) / innerMinusOuterAngle, 0.0);			
+		}
+
+		lightAmbient += attenuationFactor * lightData.color.rgb * lightAmbientFactor/* * settings.AmbientColor*/;
+
+		let lambert = max(dot(normal, -lightToPosNorm), 0.0);
+
+		lightDiffuse += attenuationFactor * lambert * lightData.color.rgb * lightDiffuseFactor;
+
+		let reflection = reflect(lightToPosNorm, normal);
+		let specFactor = max(dot(reflection, eyeVec), 0.0);
+		specFactor = pow(specFactor, 2.0 /* Shininess */);
+
+		lightSpecular += attenuationFactor * specFactor * lightData.color.rgb;
+	}
+
+	//lightSpecular *= settings.SpecularColor;
+
+	let lightColor = lightAmbient + lightDiffuse + lightSpecular;
+
+	let output: FragOut;
+	output.color = vec4[f32](lightColor, 1.0) * albedo;
+
+	return output;
+
+	/*
+		const if (ForwardPass)
+		{
+			let lightAmbient = vec3[f32](0.0, 0.0, 0.0);
+			let lightDiffuse = vec3[f32](0.0, 0.0, 0.0);
+			let lightSpecular = vec3[f32](0.0, 0.0, 0.0);
+		
+			let eyeVec = normalize(viewerData.eyePosition - input.worldPos);
+
+			for i in 0 -> lightData.lightCount
+			{
+				let light = lightData.lights[i];
+
+				let lightAmbientFactor = light.factor.x;
+				let lightDiffuseFactor = light.factor.y;
+
+				// TODO: Add switch instruction
+				if (light.type == DirectionalLight)
+				{
+					let lightDir = light.parameter1.xyz;
+
+					lightAmbient += light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+
+					let lambert = max(dot(normal, -lightDir), 0.0);
+
+					lightDiffuse += lambert * light.color.rgb * lightDiffuseFactor;
+
+					let reflection = reflect(lightDir, normal);
+					let specFactor = max(dot(reflection, eyeVec), 0.0);
+					specFactor = pow(specFactor, settings.Shininess);
+
+					lightSpecular += specFactor * light.color.rgb;
+				}
+				else if (light.type == PointLight)
+				{
+					let lightPos = light.parameter1.xyz;
+					let lightInvRadius = light.parameter1.w;
+
+					let lightToPos = input.worldPos - lightPos;
+					let dist = length(lightToPos);
+					let lightToPosNorm = lightToPos / max(dist, 0.0001);
+
+					let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
+
+					lightAmbient += attenuationFactor * light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+
+					let lambert = max(dot(normal, -lightToPosNorm), 0.0);
+
+					lightDiffuse += attenuationFactor * lambert * light.color.rgb * lightDiffuseFactor;
+
+					let reflection = reflect(lightToPosNorm, normal);
+					let specFactor = max(dot(reflection, eyeVec), 0.0);
+					specFactor = pow(specFactor, settings.Shininess);
+
+					lightSpecular += attenuationFactor * specFactor * light.color.rgb;
+				}
+				else if (light.type == SpotLight)
+				{
+					let lightPos = light.parameter1.xyz;
+					let lightDir = light.parameter2.xyz;
+					let lightInvRadius = light.parameter1.w;
+					let lightInnerAngle = light.parameter3.x;
+					let lightOuterAngle = light.parameter3.y;
+
+					let lightToPos = input.worldPos - lightPos;
+					let dist = length(lightToPos);
+					let lightToPosNorm = lightToPos / max(dist, 0.0001);
+
+					let curAngle = dot(lightDir, lightToPosNorm);
+					let innerMinusOuterAngle = lightInnerAngle - lightOuterAngle;
+
+					let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
+					attenuationFactor *= max((curAngle - lightOuterAngle) / innerMinusOuterAngle, 0.0);			
+
+					lightAmbient += attenuationFactor * light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+
+					let lambert = max(dot(normal, -lightToPosNorm), 0.0);
+
+					lightDiffuse += attenuationFactor * lambert * light.color.rgb * lightDiffuseFactor;
+
+					let reflection = reflect(lightToPosNorm, normal);
+					let specFactor = max(dot(reflection, eyeVec), 0.0);
+					specFactor = pow(specFactor, settings.Shininess);
+
+					lightSpecular += attenuationFactor * specFactor * light.color.rgb;
+				}
+			}
+
+			lightSpecular *= settings.SpecularColor;
+
+			const if (HasSpecularTexture)
+				lightSpecular *= MaterialSpecularMap.Sample(input.uv).rgb;
+
+			let lightColor = lightAmbient + lightDiffuse + lightSpecular;
+
+			let output: FragOut;
+			output.RenderTarget0 = vec4[f32](lightColor, 1.0) * diffuseColor;
+			return output;
+		}
+		else 
+		{
+			// Deferred shading
+			let output: FragOut;
+			output.DiffuseMap = diffuseColor;
+			output.NormalMap = vec4[f32](encode_normal(normal), 1.0);
+
+			return output;
+		}
+	}
+	else
+	{
+		const if (ForwardPass)
+		{
+			let output: FragOut;
+			output.RenderTarget0 = diffuseColor;
+			return output;		
+		}
+		else
+		{
+			// Deferred shading
+			let output: FragOut;
+			output.DiffuseMap = diffuseColor;
+			output.NormalMap = vec4[f32](0.0, 0.0, 0.0, 1.0);
+
+			return output;
+		}
+	}*/
+}
+
+// Vertex stage
+//[cond(LightType == DirectionalLight)]
+struct VertIn
+{
+	[location(0)] pos: vec2[f32]
+}
+/*
+[cond(LightType != DirectionalLight)]
+struct VertIn
+{
+	[location(0)] pos: vec3[f32]
+}
+*/
+struct VertOut
+{
+	[builtin(position)] position: vec4[f32]
+}
+
+[entry(vert)]
+fn main(input: VertIn) -> VertOut
+{
+	let output: VertOut;
+	//const if (LightType == DirectionalLight || LightType == PointLight)
+		output.position = vec4[f32](input.pos, 0.0, 1.0);
+	//else
+	//	output.position = viewerData.viewProjMatrix * meshData.worldMatrix * vec4[f32](input.pos, 1.0);
+
+	return output;
+}

@@ -5,6 +5,10 @@ import InstanceData from Engine.InstanceData;
 import LightData from Engine.LightData;
 import ViewerData from Engine.ViewerData;
 
+import DeferredShading.NormalEncoding;
+
+option ForwardPass: bool = true;
+
 // Basic material options
 option HasDiffuseTexture: bool = false;
 option HasAlphaTexture: bool = false;
@@ -62,11 +66,16 @@ external
 	[binding(3)] TextureOverlay: sampler2D[f32],
 	[binding(4)] instanceData: uniform[InstanceData],
 	[binding(5)] viewerData: uniform[ViewerData],
-	[binding(6)] lightData: uniform[LightData],
 	[binding(7)] MaterialEmissiveMap: sampler2D[f32],
 	[binding(8)] MaterialHeightMap: sampler2D[f32],
 	[binding(9)] MaterialNormalMap: sampler2D[f32],
 	[binding(10)] MaterialSpecularMap: sampler2D[f32],
+}
+
+[cond(ForwardPass)]
+external
+{
+	[binding(6)] lightData: uniform[LightData],
 }
 
 struct VertToFrag
@@ -80,9 +89,17 @@ struct VertToFrag
 }
 
 // Fragment stage
+[cond(ForwardPass)]
 struct FragOut
 {
 	[location(0)] RenderTarget0: vec4[f32]
+}
+
+[cond(!ForwardPass)]
+struct FragOut
+{
+	[location(0)] DiffuseMap: vec4[f32],
+	[location(1)] NormalMap: vec4[f32]
 }
 
 [entry(frag)]
@@ -110,113 +127,137 @@ fn main(input: VertToFrag) -> FragOut
 
 	const if (HasNormal)
 	{
-		let lightAmbient = vec3[f32](0.0, 0.0, 0.0);
-		let lightDiffuse = vec3[f32](0.0, 0.0, 0.0);
-		let lightSpecular = vec3[f32](0.0, 0.0, 0.0);
-
-		let eyeVec = normalize(viewerData.eyePosition - input.worldPos);
-
 		let normal: vec3[f32];
 		const if (HasNormalMapping)
 			normal = normalize(input.tbnMatrix * (MaterialNormalMap.Sample(input.uv).xyz * 2.0 - vec3[f32](1.0, 1.0, 1.0)));
 		else
 			normal = normalize(input.normal);
 
-		for i in u32(0) -> lightData.lightCount
+		const if (ForwardPass)
 		{
-			let light = lightData.lights[i];
+			let lightAmbient = vec3[f32](0.0, 0.0, 0.0);
+			let lightDiffuse = vec3[f32](0.0, 0.0, 0.0);
+			let lightSpecular = vec3[f32](0.0, 0.0, 0.0);
+		
+			let eyeVec = normalize(viewerData.eyePosition - input.worldPos);
 
-			let lightAmbientFactor = light.factor.x;
-			let lightDiffuseFactor = light.factor.y;
-
-			// TODO: Add switch instruction
-			if (light.type == DirectionalLight)
+			for i in u32(0) -> lightData.lightCount
 			{
-				let lightDir = light.parameter1.xyz;
+				let light = lightData.lights[i];
 
-				lightAmbient += light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+				let lightAmbientFactor = light.factor.x;
+				let lightDiffuseFactor = light.factor.y;
 
-				let lambert = max(dot(normal, -lightDir), 0.0);
+				// TODO: Add switch instruction
+				if (light.type == DirectionalLight)
+				{
+					let lightDir = light.parameter1.xyz;
 
-				lightDiffuse += lambert * light.color.rgb * lightDiffuseFactor;
+					lightAmbient += light.color.rgb * lightAmbientFactor * settings.AmbientColor;
 
-				let reflection = reflect(lightDir, normal);
-				let specFactor = max(dot(reflection, eyeVec), 0.0);
-				specFactor = pow(specFactor, settings.Shininess);
+					let lambert = max(dot(normal, -lightDir), 0.0);
 
-				lightSpecular += specFactor * light.color.rgb;
+					lightDiffuse += lambert * light.color.rgb * lightDiffuseFactor;
+
+					let reflection = reflect(lightDir, normal);
+					let specFactor = max(dot(reflection, eyeVec), 0.0);
+					specFactor = pow(specFactor, settings.Shininess);
+
+					lightSpecular += specFactor * light.color.rgb;
+				}
+				else if (light.type == PointLight)
+				{
+					let lightPos = light.parameter1.xyz;
+					let lightInvRadius = light.parameter1.w;
+
+					let lightToPos = input.worldPos - lightPos;
+					let dist = length(lightToPos);
+					let lightToPosNorm = lightToPos / max(dist, 0.0001);
+
+					let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
+
+					lightAmbient += attenuationFactor * light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+
+					let lambert = max(dot(normal, -lightToPosNorm), 0.0);
+
+					lightDiffuse += attenuationFactor * lambert * light.color.rgb * lightDiffuseFactor;
+
+					let reflection = reflect(lightToPosNorm, normal);
+					let specFactor = max(dot(reflection, eyeVec), 0.0);
+					specFactor = pow(specFactor, settings.Shininess);
+
+					lightSpecular += attenuationFactor * specFactor * light.color.rgb;
+				}
+				else if (light.type == SpotLight)
+				{
+					let lightPos = light.parameter1.xyz;
+					let lightDir = light.parameter2.xyz;
+					let lightInvRadius = light.parameter1.w;
+					let lightInnerAngle = light.parameter3.x;
+					let lightOuterAngle = light.parameter3.y;
+
+					let lightToPos = input.worldPos - lightPos;
+					let dist = length(lightToPos);
+					let lightToPosNorm = lightToPos / max(dist, 0.0001);
+
+					let curAngle = dot(lightDir, lightToPosNorm);
+					let innerMinusOuterAngle = lightInnerAngle - lightOuterAngle;
+
+					let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
+					attenuationFactor *= max((curAngle - lightOuterAngle) / innerMinusOuterAngle, 0.0);			
+
+					lightAmbient += attenuationFactor * light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+
+					let lambert = max(dot(normal, -lightToPosNorm), 0.0);
+
+					lightDiffuse += attenuationFactor * lambert * light.color.rgb * lightDiffuseFactor;
+
+					let reflection = reflect(lightToPosNorm, normal);
+					let specFactor = max(dot(reflection, eyeVec), 0.0);
+					specFactor = pow(specFactor, settings.Shininess);
+
+					lightSpecular += attenuationFactor * specFactor * light.color.rgb;
+				}
 			}
-			else if (light.type == PointLight)
-			{
-				let lightPos = light.parameter1.xyz;
-				let lightInvRadius = light.parameter1.w;
 
-				let lightToPos = input.worldPos - lightPos;
-				let dist = length(lightToPos);
-				let lightToPosNorm = lightToPos / max(dist, 0.0001);
+			lightSpecular *= settings.SpecularColor;
 
-				let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
+			const if (HasSpecularTexture)
+				lightSpecular *= MaterialSpecularMap.Sample(input.uv).rgb;
 
-				lightAmbient += attenuationFactor * light.color.rgb * lightAmbientFactor * settings.AmbientColor;
+			let lightColor = lightAmbient + lightDiffuse + lightSpecular;
 
-				let lambert = max(dot(normal, -lightToPosNorm), 0.0);
-
-				lightDiffuse += attenuationFactor * lambert * light.color.rgb * lightDiffuseFactor;
-
-				let reflection = reflect(lightToPosNorm, normal);
-				let specFactor = max(dot(reflection, eyeVec), 0.0);
-				specFactor = pow(specFactor, settings.Shininess);
-
-				lightSpecular += attenuationFactor * specFactor * light.color.rgb;
-			}
-			else if (light.type == SpotLight)
-			{
-				let lightPos = light.parameter1.xyz;
-				let lightDir = light.parameter2.xyz;
-				let lightInvRadius = light.parameter1.w;
-				let lightInnerAngle = light.parameter3.x;
-				let lightOuterAngle = light.parameter3.y;
-
-				let lightToPos = input.worldPos - lightPos;
-				let dist = length(lightToPos);
-				let lightToPosNorm = lightToPos / max(dist, 0.0001);
-
-				let curAngle = dot(lightDir, lightToPosNorm);
-				let innerMinusOuterAngle = lightInnerAngle - lightOuterAngle;
-
-				let attenuationFactor = max(1.0 - dist * lightInvRadius, 0.0);
-				attenuationFactor *= max((curAngle - lightOuterAngle) / innerMinusOuterAngle, 0.0);			
-
-				lightAmbient += attenuationFactor * light.color.rgb * lightAmbientFactor * settings.AmbientColor;
-
-				let lambert = max(dot(normal, -lightToPosNorm), 0.0);
-
-				lightDiffuse += attenuationFactor * lambert * light.color.rgb * lightDiffuseFactor;
-
-				let reflection = reflect(lightToPosNorm, normal);
-				let specFactor = max(dot(reflection, eyeVec), 0.0);
-				specFactor = pow(specFactor, settings.Shininess);
-
-				lightSpecular += attenuationFactor * specFactor * light.color.rgb;
-			}
+			let output: FragOut;
+			output.RenderTarget0 = vec4[f32](lightColor, 1.0) * diffuseColor;
+			return output;
 		}
+		else 
+		{
+			// Deferred shading
+			let output: FragOut;
+			output.DiffuseMap = diffuseColor;
+			output.NormalMap = vec4[f32](EncodeNormal(normal), 1.0);
 
-		lightSpecular *= settings.SpecularColor;
-
-		const if (HasSpecularTexture)
-			lightSpecular *= MaterialSpecularMap.Sample(input.uv).rgb;
-
-		let lightColor = lightAmbient + lightDiffuse + lightSpecular;
-
-		let output: FragOut;
-		output.RenderTarget0 = vec4[f32](lightColor, 1.0) * diffuseColor;
-		return output;
+			return output;
+		}
 	}
 	else
 	{
-		let output: FragOut;
-		output.RenderTarget0 = diffuseColor;
-		return output;
+		const if (ForwardPass)
+		{
+			let output: FragOut;
+			output.RenderTarget0 = diffuseColor;
+			return output;		
+		}
+		else
+		{
+			// Deferred shading
+			let output: FragOut;
+			output.DiffuseMap = diffuseColor;
+			output.NormalMap = vec4[f32](0.0, 0.0, 0.0, 1.0);
+
+			return output;
+		}
 	}
 }
 

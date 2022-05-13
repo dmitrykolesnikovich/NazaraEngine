@@ -64,19 +64,28 @@ int main()
 
 	std::shared_ptr<Nz::Material> material = std::make_shared<Nz::Material>();
 
+	std::shared_ptr<Nz::MaterialPass> gbufferPass = std::make_shared<Nz::MaterialPass>(Nz::PhongLightingMaterial::GetSettings());
+	gbufferPass->SetOptionValue(0, false); //< pls don't do that
+	gbufferPass->EnableDepthBuffer(true);
+	gbufferPass->EnableFaceCulling(true);
+
 	std::shared_ptr<Nz::MaterialPass> forwardPass = std::make_shared<Nz::MaterialPass>(Nz::PhongLightingMaterial::GetSettings());
 	forwardPass->EnableDepthBuffer(true);
 	forwardPass->EnableFaceCulling(true);
 
+	material->AddPass("GBufferPass", gbufferPass);
 	material->AddPass("ForwardPass", forwardPass);
 
 	std::shared_ptr<Nz::Texture> normalMap = Nz::Texture::LoadFromFile(resourceDir / "Spaceship/Texture/normal.png", texParams);
 
-	Nz::PhongLightingMaterial phongMat(*forwardPass);
-	phongMat.EnableAlphaTest(false);
-	phongMat.SetAlphaMap(Nz::Texture::LoadFromFile(resourceDir / "alphatile.png", texParams));
-	phongMat.SetDiffuseMap(Nz::Texture::LoadFromFile(resourceDir / "Spaceship/Texture/diffuse.png", texParams));
-	phongMat.SetNormalMap(Nz::Texture::LoadFromFile(resourceDir / "Spaceship/Texture/normal.png", texParams));
+	for (const auto& mat : { gbufferPass, forwardPass })
+	{
+		Nz::PhongLightingMaterial phongMat(*mat);
+		phongMat.EnableAlphaTest(false);
+		phongMat.SetAlphaMap(Nz::Texture::LoadFromFile(resourceDir / "alphatile.png", texParams));
+		phongMat.SetDiffuseMap(Nz::Texture::LoadFromFile(resourceDir / "Spaceship/Texture/diffuse.png", texParams));
+		phongMat.SetNormalMap(Nz::Texture::LoadFromFile(resourceDir / "Spaceship/Texture/normal.png", texParams));
+	}
 
 	Nz::Model model(std::move(gfxMesh), spaceshipMesh->GetAABB());
 	for (std::size_t i = 0; i < model.GetSubMeshCount(); ++i)
@@ -99,7 +108,7 @@ int main()
 
 	Nz::Recti scissorBox(Nz::Vector2i(window.GetSize()));
 
-	Nz::ForwardFramePipeline framePipeline;
+	Nz::DeferredFramePipeline framePipeline;
 	std::size_t cameraIndex = framePipeline.RegisterViewer(&camera, 0);
 	std::size_t worldInstanceIndex1 = framePipeline.RegisterWorldInstance(modelInstance);
 	std::size_t worldInstanceIndex2 = framePipeline.RegisterWorldInstance(modelInstance2);
@@ -137,7 +146,7 @@ int main()
 					break;
 
 				case Nz::WindowEventType::KeyPressed:
-					if (event.key.virtualKey == Nz::Keyboard::VKey::A)
+					/*if (event.key.virtualKey == Nz::Keyboard::VKey::A)
 						phongMat.EnableAlphaTest(!phongMat.IsAlphaTestEnabled());
 					else if (event.key.virtualKey == Nz::Keyboard::VKey::N)
 					{
@@ -146,7 +155,7 @@ int main()
 						else
 							phongMat.SetNormalMap(normalMap);
 					}
-					else if (event.key.virtualKey == Nz::Keyboard::VKey::Space)
+					else */if (event.key.virtualKey == Nz::Keyboard::VKey::Space)
 					{
 						modelInstance->UpdateWorldMatrix(Nz::Matrix4f::Translate(viewerPos));
 						framePipeline.InvalidateWorldInstance(worldInstanceIndex1);

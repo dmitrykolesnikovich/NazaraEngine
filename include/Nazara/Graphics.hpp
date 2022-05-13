@@ -35,6 +35,7 @@
 #include <Nazara/Graphics/BasicMaterial.hpp>
 #include <Nazara/Graphics/Camera.hpp>
 #include <Nazara/Graphics/Config.hpp>
+#include <Nazara/Graphics/DeferredFramePipeline.hpp>
 #include <Nazara/Graphics/DepthMaterial.hpp>
 #include <Nazara/Graphics/DepthPipelinePass.hpp>
 #include <Nazara/Graphics/DirectionalLight.hpp>
@@ -47,11 +48,13 @@
 #include <Nazara/Graphics/FramePassAttachment.hpp>
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/FramePipelinePass.hpp>
+#include <Nazara/Graphics/GBufferPipelinePass.hpp>
 #include <Nazara/Graphics/GraphicalMesh.hpp>
 #include <Nazara/Graphics/Graphics.hpp>
 #include <Nazara/Graphics/GuillotineTextureAtlas.hpp>
 #include <Nazara/Graphics/InstancedRenderable.hpp>
 #include <Nazara/Graphics/Light.hpp>
+#include <Nazara/Graphics/LightingPipelinePass.hpp>
 #include <Nazara/Graphics/Material.hpp>
 #include <Nazara/Graphics/MaterialPass.hpp>
 #include <Nazara/Graphics/MaterialPassRegistry.hpp>

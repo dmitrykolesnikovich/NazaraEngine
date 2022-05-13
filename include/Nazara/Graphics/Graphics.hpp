@@ -21,6 +21,7 @@
 namespace Nz
 {
 	class RenderBuffer;
+	class ShaderModule;
 
 	class NAZARA_GRAPHICS_API Graphics : public ModuleBase<Graphics>
 	{
@@ -40,6 +41,7 @@ namespace Nz
 			inline const DefaultTextures& GetDefaultTextures() const;
 			inline MaterialPassRegistry& GetMaterialPassRegistry();
 			inline const MaterialPassRegistry& GetMaterialPassRegistry() const;
+			inline PixelFormat GetPreferredDepthFormat() const;
 			inline PixelFormat GetPreferredDepthStencilFormat() const;
 			inline const std::shared_ptr<RenderDevice>& GetRenderDevice() const;
 			inline const RenderPassCache& GetRenderPassCache() const;
@@ -74,6 +76,7 @@ namespace Nz
 			std::shared_ptr<RenderPipelineLayout> m_blitPipelineLayout;
 			DefaultTextures m_defaultTextures;
 			MaterialPassRegistry m_materialPassRegistry;
+			PixelFormat m_preferredDepthFormat;
 			PixelFormat m_preferredDepthStencilFormat;
 
 			static Graphics* s_instance;
