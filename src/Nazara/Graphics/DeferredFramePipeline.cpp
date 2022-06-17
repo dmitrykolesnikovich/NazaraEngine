@@ -3,7 +3,6 @@
 // For conditions of distribution and use, see copyright notice in Config.hpp
 
 #include <Nazara/Graphics/DeferredFramePipeline.hpp>
-#include <Nazara/Core/StackArray.hpp>
 #include <Nazara/Graphics/AbstractViewer.hpp>
 #include <Nazara/Graphics/FrameGraph.hpp>
 #include <Nazara/Graphics/Graphics.hpp>
@@ -21,6 +20,7 @@
 #include <Nazara/Renderer/RenderFrame.hpp>
 #include <Nazara/Renderer/RenderTarget.hpp>
 #include <Nazara/Renderer/UploadPool.hpp>
+#include <Nazara/Utils/StackArray.hpp>
 #include <array>
 #include <Nazara/Graphics/Debug.hpp>
 
@@ -381,7 +381,6 @@ namespace Nz
 						builder.SetScissor(renderRegion);
 						builder.SetViewport(renderRegion);
 						builder.BindPipeline(*graphics->GetBlitPipeline(false));
-						builder.BindVertexBuffer(0, *graphics->GetFullscreenVertexBuffer());
 
 						builder.BindShaderBinding(0, *data.blitShaderBinding);
 						builder.Draw(3);
@@ -569,7 +568,6 @@ namespace Nz
 
 				Graphics* graphics = Graphics::Instance();
 				builder.BindPipeline(*graphics->GetBlitPipeline(false));
-				builder.BindVertexBuffer(0, *graphics->GetFullscreenVertexBuffer());
 
 				bool first = true;
 

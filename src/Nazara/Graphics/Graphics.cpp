@@ -37,10 +37,6 @@ namespace Nz
 			#include <Nazara/Graphics/Resources/Shaders/PhongMaterial.nzslb.h>
 		};
 
-		const UInt8 r_fullscreenVertexShader[] = {
-			#include <Nazara/Graphics/Resources/Shaders/Fullscreen.vert.nzslb.h>
-		};
-
 		const UInt8 r_instanceDataModule[] = {
 			#include <Nazara/Graphics/Resources/Shaders/Modules/Engine/InstanceData.nzslb.h>
 		};
@@ -104,7 +100,6 @@ namespace Nz
 
 		BuildDefaultTextures();
 		RegisterShaderModules();
-		BuildFullscreenVertexBuffer();
 		BuildBlitPipeline();
 		RegisterMaterialPasses();
 		SelectDepthStencilFormats();

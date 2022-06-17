@@ -9,10 +9,10 @@
 #include <Nazara/Graphics/Graphics.hpp>
 #include <Nazara/Graphics/Light.hpp>
 #include <Nazara/Graphics/PredefinedShaderStructs.hpp>
-#include <Nazara/Graphics/ViewerInstance.hpp>
 #include <Nazara/Graphics/UberShader.hpp>
+#include <Nazara/Graphics/ViewerInstance.hpp>
 #include <Nazara/Renderer/RenderFrame.hpp>
-#include <Nazara/Shader/ShaderLangParser.hpp>
+#include <NZSL/Parser.hpp>
 #include <Nazara/Graphics/Debug.hpp>
 
 namespace Nz
@@ -32,27 +32,27 @@ namespace Nz
 			{
 				0, 0,
 				ShaderBindingType::UniformBuffer,
-				ShaderStageType::Fragment | ShaderStageType::Vertex
+				nzsl::ShaderStageType::Fragment | nzsl::ShaderStageType::Vertex
 			},
 			{
 				0, 1,
 				ShaderBindingType::Texture,
-				ShaderStageType::Fragment
+				nzsl::ShaderStageType::Fragment
 			},
 			{
 				0, 2,
 				ShaderBindingType::Texture,
-				ShaderStageType::Fragment
+				nzsl::ShaderStageType::Fragment
 			},
 			{
 				0, 3,
 				ShaderBindingType::Texture,
-				ShaderStageType::Fragment
+				nzsl::ShaderStageType::Fragment
 			},
 			{
 				1, 0,
 				ShaderBindingType::UniformBuffer,
-				ShaderStageType::Fragment
+				nzsl::ShaderStageType::Fragment
 			}
 		});
 
@@ -61,12 +61,12 @@ namespace Nz
 		pipelineLayoutInfo.bindings.push_back({
 			1, 1,
 			ShaderBindingType::UniformBuffer,
-			ShaderStageType::Vertex
+			nzsl::ShaderStageType::Vertex
 		});
 
 		m_pointSpotPipelineLayout = renderDevice->InstantiateRenderPipelineLayout(pipelineLayoutInfo);
 
-		m_passUberShader = std::make_shared<UberShader>(ShaderStageType::Fragment | ShaderStageType::Vertex, "PhongLightingPass");
+		m_passUberShader = std::make_shared<UberShader>(nzsl::ShaderStageType::Fragment | nzsl::ShaderStageType::Vertex, "PhongLightingPass");
 
 		for (BasicLightType lightType : { BasicLightType::Directional, BasicLightType::Point, BasicLightType::Spot })
 		{
@@ -79,10 +79,6 @@ namespace Nz
 			if (lightType == BasicLightType::Directional)
 			{
 				pipelineInfo.pipelineLayout = m_directionalPipelineLayout;
-				pipelineInfo.vertexBuffers.push_back({
-					0,
-					graphics->GetFullscreenVertexDeclaration()
-				});
 			}
 			else
 			{
@@ -93,10 +89,6 @@ namespace Nz
 					VertexDeclaration::Get(VertexLayout::XYZ)
 				});
 */
-				pipelineInfo.vertexBuffers.push_back({
-					0,
-					graphics->GetFullscreenVertexDeclaration()
-				});
 			}
 
 			UberShader::Config config;
@@ -283,7 +275,6 @@ namespace Nz
 			if (!m_directionalLights.empty())
 			{
 				builder.BindPipeline(*m_renderPipelines[UnderlyingCast(BasicLightType::Directional)]);
-				builder.BindVertexBuffer(0, *graphics->GetFullscreenVertexBuffer());
 
 				for (const auto& directionalLight : m_directionalLights)
 				{
@@ -295,7 +286,6 @@ namespace Nz
 			if (!m_pointLights.empty())
 			{
 				builder.BindPipeline(*m_renderPipelines[UnderlyingCast(BasicLightType::Point)]);
-				builder.BindVertexBuffer(0, *graphics->GetFullscreenVertexBuffer());
 
 				for (const auto& pointLight : m_pointLights)
 				{
@@ -307,7 +297,6 @@ namespace Nz
 			if (!m_spotLights.empty())
 			{
 				builder.BindPipeline(*m_renderPipelines[UnderlyingCast(BasicLightType::Spot)]);
-				builder.BindVertexBuffer(0, *graphics->GetFullscreenVertexBuffer());
 
 				for (const auto& spotLight : m_spotLights)
 				{

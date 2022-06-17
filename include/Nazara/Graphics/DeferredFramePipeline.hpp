@@ -8,7 +8,6 @@
 #define NAZARA_GRAPHICS_DEFERREDFRAMEPIPELINE_HPP
 
 #include <Nazara/Prerequisites.hpp>
-#include <Nazara/Core/MemoryPool.hpp>
 #include <Nazara/Graphics/BakedFrameGraph.hpp>
 #include <Nazara/Graphics/Config.hpp>
 #include <Nazara/Graphics/DepthPipelinePass.hpp>
@@ -17,13 +16,14 @@
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/GBufferPipelinePass.hpp>
 #include <Nazara/Graphics/InstancedRenderable.hpp>
-#include <Nazara/Graphics/LightingPipelinePass.hpp>
 #include <Nazara/Graphics/Light.hpp>
+#include <Nazara/Graphics/LightingPipelinePass.hpp>
 #include <Nazara/Graphics/MaterialPass.hpp>
 #include <Nazara/Graphics/RenderElement.hpp>
 #include <Nazara/Graphics/RenderQueue.hpp>
 #include <Nazara/Graphics/RenderQueueRegistry.hpp>
 #include <Nazara/Renderer/ShaderBinding.hpp>
+#include <Nazara/Utils/MemoryPool.hpp>
 #include <memory>
 #include <optional>
 #include <unordered_map>

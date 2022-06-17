@@ -1,9 +1,10 @@
 [nzsl_version("1.0")]
 module PhongLightingPass;
 
-import DeferredShading.NormalEncoding;
-import Engine.LightData; //< TODO: Import only Light
-import Engine.ViewerData;
+import VertOut, VertexShader from Engine.FullscreenVertex;
+import DecodeNormal from DeferredShading.NormalEncoding;
+import Light from Engine.LightData;
+import ViewerData from Engine.ViewerData;
 
 option LightType: i32;
 
@@ -62,7 +63,7 @@ external
 
 struct FragIn
 {
-	[builtin(fragcoord)] fragcoord: vec4[f32]
+	[builtin(frag_coord)] fragcoord: vec4[f32]
 }
 
 struct FragOut
@@ -280,34 +281,4 @@ fn main(input: FragIn) -> FragOut
 			return output;
 		}
 	}*/
-}
-
-// Vertex stage
-//[cond(LightType == DirectionalLight)]
-struct VertIn
-{
-	[location(0)] pos: vec2[f32]
-}
-/*
-[cond(LightType != DirectionalLight)]
-struct VertIn
-{
-	[location(0)] pos: vec3[f32]
-}
-*/
-struct VertOut
-{
-	[builtin(position)] position: vec4[f32]
-}
-
-[entry(vert)]
-fn main(input: VertIn) -> VertOut
-{
-	let output: VertOut;
-	//const if (LightType == DirectionalLight || LightType == PointLight)
-		output.position = vec4[f32](input.pos, 0.0, 1.0);
-	//else
-	//	output.position = viewerData.viewProjMatrix * meshData.worldMatrix * vec4[f32](input.pos, 1.0);
-
-	return output;
 }

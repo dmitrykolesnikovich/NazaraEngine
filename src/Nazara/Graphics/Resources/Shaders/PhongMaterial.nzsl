@@ -5,7 +5,7 @@ import InstanceData from Engine.InstanceData;
 import LightData from Engine.LightData;
 import ViewerData from Engine.ViewerData;
 
-import DeferredShading.NormalEncoding;
+import EncodeNormal from DeferredShading.NormalEncoding;
 
 option ForwardPass: bool = true;
 
